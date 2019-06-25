@@ -1,4 +1,5 @@
 import requests
+import datetime
 from flask import Blueprint
 from flask import render_template, current_app, url_for, request, redirect
 
@@ -33,11 +34,7 @@ def dynamic_form(schema):
             db.session.add(entry)
             db.session.commit()
             obj = db.session.query(DynamicModel).order_by(DynamicModel.id.desc()).first()
-            print(obj)
-            id = obj.id
-            print(id)
-            # return redirect('/')
-            return redirect(url_for('frontend.check', schema=schema, row=id))
+            return redirect(url_for('frontend.check', schema=schema, row=obj.id))
     else:
         form = form_object()
 
@@ -52,4 +49,20 @@ def check(schema, row):
     data_list = convert_ordered_dicts_for_dl(entry.json_blob)
 
     return render_template('check.html', data=data_list, title=title)
+
+@frontend.route('/<schema>/<row>/edit')
+def edit(schema, row):
+    schema = schema
+    schema_url = f"{current_app.config['SCHEMA_URL']}/{schema}-schema.json"
+    schema_json = requests.get(schema_url).json()
+    form_object = formfactory(schema_json)
+    entry = DynamicModel.query.filter_by(id=row).first()
+    data = entry.json_blob
+    for k, v in data.items():
+        if "date" in k and v is not None:
+            data[k] = datetime.datetime.strptime(v, '%Y-%m-%d').date()
+    title = "Editing the form"
+    form = form_object(**data)
+
+    return render_template('dynamicform.html', form=form, schema=schema, title=title)
 
